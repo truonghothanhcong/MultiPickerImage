@@ -18,7 +18,6 @@ class MultiPickerViewController: UIViewController {
     var urlImage: [URL?]!   // <-- Array to hold url of image
     var isSelectItem: [Bool]! // <-- Array to hold item is select
     var countPicked = 0
-    var photosAsset: PHFetchResult<PHAsset>!
     
     var indexStart: IndexPath?
     var indexEnd:   IndexPath?
@@ -135,6 +134,8 @@ extension MultiPickerViewController {
     // the index until all the photos are fetched
     func fetchPhotoAtIndexFromEnd(index:Int) {
         
+        let imgManager = PHImageManager.default()
+        
         // Note that if the request is not set to synchronous
         // the requestImageForAsset will return both the image
         // and thumbnail; by setting synchronous to true it
@@ -142,12 +143,40 @@ extension MultiPickerViewController {
         let requestOptions = PHImageRequestOptions()
         requestOptions.isSynchronous = true
         
+        
         // Sort the images by creation date
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key:"creationDate", ascending: true)]
         
-        self.photosAsset = PHAsset.fetchAssets(with: PHAssetMediaType.image, options: fetchOptions)
-        self.isSelectItem = [Bool].init(repeating: false, count: self.photosAsset.count)
+        let fetchResult: PHFetchResult = PHAsset.fetchAssets(with: PHAssetMediaType.image, options: fetchOptions)
+            
+        // If the fetch result isn't empty,
+        // proceed with the image request
+        if fetchResult.count > 0 {
+            let fetchPHAsset = fetchResult.object(at: fetchResult.count - 1 - index) as PHAsset
+            // Perform the image request
+            imgManager.requestImage(for: fetchPHAsset, targetSize: view.frame.size, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, _) in
+                
+                fetchPHAsset.getURL(completionHandler: { (url: URL?) in
+                    self.urlImage.append(url)
+                    self.collectionView.reloadData()
+                })
+                
+                
+                // If you haven't already reached the first
+                // index of the fetch result and if you haven't
+                // already stored all of the images you need,
+                // perform the fetch request again with an
+                // incremented index
+                if index + 1 < fetchResult.count  {
+                    self.fetchPhotoAtIndexFromEnd(index: index + 1)
+                } else {
+                    // Else you have completed creating your array
+                    print("Completed array: \(self.urlImage.count)")
+                }
+            })
+        }
+    
     }
     
 }
@@ -155,30 +184,14 @@ extension MultiPickerViewController {
 extension MultiPickerViewController: UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         
-        if(self.photosAsset != nil){
-            return self.photosAsset.count
-        }
-        return 0
+        return urlImage.count
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ImageCell", for: indexPath) as! ImageCollectionViewCell
         
-        let requestOptions = PHImageRequestOptions()
-        requestOptions.isSynchronous = true
-        
-        //Modify the cell
-        let asset: PHAsset = self.photosAsset[indexPath.item]
-        
-        PHImageManager.default().requestImage(for: asset, targetSize: view.frame.size, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, _) in
-            if let img = image {
-                cell.imageView.image = img
-                asset.getURL(completionHandler: { (url) in
-                    self.urlImage.append(url)
-                })
-            }
-        })
+        cell.imageView.image = UIImage(contentsOfFile: (urlImage[indexPath.row]?.absoluteString.replacingOccurrences(of: "file://", with: ""))!)
         
         return cell
     }

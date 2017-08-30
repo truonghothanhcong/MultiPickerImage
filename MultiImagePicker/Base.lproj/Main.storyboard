@@ -158,7 +158,7 @@
                     </connections>
                 </pongPressGestureRecognizer>
             </objects>
-            <point key="canvasLocation" x="770.39999999999998" y="36.431784107946029"/>
+            <point key="canvasLocation" x="847" y="124"/>
         </scene>
     </scenes>
 </document>
