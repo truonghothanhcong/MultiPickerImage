@@ -11,15 +11,23 @@ import Photos
 
 
 
-class ViewController: UIViewController {
+class ViewController: UIViewController, MultiImagePickerDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view, typically from a nib.
         
-        
-        
     }
     
+    func pickerMultiImage(images: [UIImage]) {
+        print(images.count)
+    }
+    
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        let vc = segue.destination as! MultiPickerViewController
+        
+        vc.delegate = self
+    }
 }
 

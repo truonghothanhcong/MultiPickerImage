@@ -9,6 +9,10 @@
 import UIKit
 import Photos
 
+protocol MultiImagePickerDelegate: class {
+    func pickerMultiImage(images: [UIImage])
+}
+
 class MultiPickerViewController: UIViewController {
     
     @IBOutlet weak var uploadImageButton: UIButton!
@@ -24,6 +28,8 @@ class MultiPickerViewController: UIViewController {
     var indexStart: IndexPath?
     var indexEnd:   IndexPath?
     var indexTemp:  IndexPath?
+    
+    weak var delegate: MultiImagePickerDelegate?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -48,7 +54,7 @@ class MultiPickerViewController: UIViewController {
             }
         }
         
-        print(images.count)
+        self.delegate?.pickerMultiImage(images: images)
         
         self.dismiss(animated: true, completion: nil)
     }
