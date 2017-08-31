@@ -15,9 +15,11 @@ class MultiPickerViewController: UIViewController {
     @IBOutlet weak var countLabel: UILabel!
     @IBOutlet weak var collectionView: UICollectionView!
     
-    var urlImage: [URL?]!   // <-- Array to hold url of image
     var isSelectItem: [Bool]! // <-- Array to hold item is select
     var countPicked = 0
+    var fetchAsset: PHFetchResult<PHAsset>!
+    let imgManager = PHImageManager.default()
+    let requestOptions = PHImageRequestOptions()
     
     var indexStart: IndexPath?
     var indexEnd:   IndexPath?
@@ -30,18 +32,23 @@ class MultiPickerViewController: UIViewController {
     }
     
     @IBAction func upload(_ sender: Any) {
-        var urlSelected = [URL]()
+        var images = [UIImage]()
         
-        let count = urlImage.count
+        requestOptions.isSynchronous = false
+        
+        let count = fetchAsset.count
         for i in 0 ..< count {
-            if isSelectItem[i] && urlImage[i] != nil {
-                urlSelected.append(urlImage[i]!)
+            if isSelectItem[i] {
+                let fetchPHAsset = fetchAsset.object(at: i)
+                // Perform the image request
+                imgManager.requestImage(for: fetchPHAsset, targetSize: view.frame.size, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, _) in
+                    
+                    images.append(image!)
+                })
             }
         }
         
-        for i in urlSelected {
-            print(i)
-        }
+        print(images.count)
         
         self.dismiss(animated: true, completion: nil)
     }
@@ -125,8 +132,6 @@ class MultiPickerViewController: UIViewController {
 extension MultiPickerViewController {
     
     func fetchPhotos () {
-        //imagesGalary = [UIImage]()
-        urlImage     = [URL]()
         self.fetchPhotoAtIndexFromEnd(index: 0)
     }
     
@@ -134,48 +139,11 @@ extension MultiPickerViewController {
     // the index until all the photos are fetched
     func fetchPhotoAtIndexFromEnd(index:Int) {
         
-        let imgManager = PHImageManager.default()
-        
-        // Note that if the request is not set to synchronous
-        // the requestImageForAsset will return both the image
-        // and thumbnail; by setting synchronous to true it
-        // will return just the thumbnail
-        let requestOptions = PHImageRequestOptions()
-        requestOptions.isSynchronous = true
-        
-        
         // Sort the images by creation date
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key:"creationDate", ascending: true)]
         
-        let fetchResult: PHFetchResult = PHAsset.fetchAssets(with: PHAssetMediaType.image, options: fetchOptions)
-            
-        // If the fetch result isn't empty,
-        // proceed with the image request
-        if fetchResult.count > 0 {
-            let fetchPHAsset = fetchResult.object(at: fetchResult.count - 1 - index) as PHAsset
-            // Perform the image request
-            imgManager.requestImage(for: fetchPHAsset, targetSize: view.frame.size, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, _) in
-                
-                fetchPHAsset.getURL(completionHandler: { (url: URL?) in
-                    self.urlImage.append(url)
-                    self.collectionView.reloadData()
-                })
-                
-                
-                // If you haven't already reached the first
-                // index of the fetch result and if you haven't
-                // already stored all of the images you need,
-                // perform the fetch request again with an
-                // incremented index
-                if index + 1 < fetchResult.count  {
-                    self.fetchPhotoAtIndexFromEnd(index: index + 1)
-                } else {
-                    // Else you have completed creating your array
-                    print("Completed array: \(self.urlImage.count)")
-                }
-            })
-        }
+        fetchAsset = PHAsset.fetchAssets(with: PHAssetMediaType.image, options: fetchOptions)
     
     }
     
@@ -184,14 +152,29 @@ extension MultiPickerViewController {
 extension MultiPickerViewController: UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         
-        return urlImage.count
+        if fetchAsset != nil {
+            countLabel.text = "\(countPicked)/\(fetchAsset.count)"
+            isSelectItem = [Bool](repeating: false, count: fetchAsset.count)
+            return fetchAsset.count
+        }
+        
+        return 0
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ImageCell", for: indexPath) as! ImageCollectionViewCell
         
-        cell.imageView.image = UIImage(contentsOfFile: (urlImage[indexPath.row]?.absoluteString.replacingOccurrences(of: "file://", with: ""))!)
+        let _ = isSelectItem[indexPath.row] ? cell.selectCell() : cell.deselectCell()
+        
+        requestOptions.isSynchronous = false
+        
+        let fetchPHAsset = fetchAsset.object(at: indexPath.row)
+        // Perform the image request
+        imgManager.requestImage(for: fetchPHAsset, targetSize: view.frame.size, contentMode: PHImageContentMode.aspectFill, options: requestOptions, resultHandler: { (image, _) in
+            
+            cell.imageView.image = image
+        })
         
         return cell
     }
@@ -208,7 +191,7 @@ extension MultiPickerViewController: UICollectionViewDelegate, UICollectionViewD
         else {
             countPicked -= 1
         }
-        countLabel.text = String(countPicked)
+        countLabel.text = "\(countPicked)/\(fetchAsset.count)"
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
